@@ -1,0 +1,88 @@
+.layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.navLink,
+.navActive {
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  text-decoration: none;
+  color: var(--text-muted);
+}
+
+.navLink:hover {
+  color: var(--text);
+  background: var(--bg-input);
+}
+
+.navActive {
+  color: var(--primary-hover);
+  background: rgba(49, 176, 153, 0.15);
+}
+
+.userRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.role {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  background: var(--bg-input);
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+
+.email {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.logout {
+  padding: 0.4rem 0.9rem;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.9rem;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.logout:hover {
+  background: var(--border);
+  border-color: var(--primary);
+  color: var(--primary-hover);
+}
+
+.main {
+  flex: 1;
+  padding: 1.5rem;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}

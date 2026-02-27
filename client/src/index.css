@@ -1,0 +1,68 @@
+/* WisdomLinked-inspired theme: dark + teal/cyan accents */
+:root {
+  --bg-dark: #0d0d0d;
+  --bg-card: #141414;
+  --bg-input: #1f1f1f;
+  --border: #292929;
+  --border-light: #6c7278;
+  --text: #dce4e8;
+  --text-muted: #6c7278;
+  --primary: #31b099;
+  --primary-hover: #3bdbbe;
+  --accent: #76d1f7;
+  --link: #35b5fd;
+  --gradient: linear-gradient(114.9deg, #3bdbbe 9.79%, #76d1f7 71.23%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-dark);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--border);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 12px;
+}
+
+.gradient_text {
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input, textarea {
+  font-family: inherit;
+}
