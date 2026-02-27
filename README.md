@@ -83,6 +83,13 @@ UI follows the same color theme as [WisdomLinked](https://github.com/WisdomLinke
 
    - For a **full-stack** deployment, host the backend somewhere that runs Node, then set the frontend’s API base URL (e.g. via env) to that backend when building.
 
+## GitHub Actions + Pages deployment
+
+1. Deploy the **backend** (Railway, Render, etc.) and copy its URL.
+2. Repo **Settings → Secrets and variables → Actions** → add **variable** `BACKEND_URL` = your backend URL.
+3. Repo **Settings → Pages** → Source: **GitHub Actions**.
+4. Push to `main`; the workflow deploys the frontend. Site: `https://<username>.github.io/<repo-name>/`
+
 ## Environment (optional)
 
 - **Backend** (`server/`): `PORT` (default `4001`)

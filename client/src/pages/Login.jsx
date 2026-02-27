@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { API } from '../config';
 import styles from './Login.module.css';
-
-const API = '/api';
 
 export default function Login() {
   const [view, setView] = useState('main'); // 'main' | 'login' | 'register' | 'loginStudent' | 'loginCommittee' | 'registerStudent' | 'registerCommittee'

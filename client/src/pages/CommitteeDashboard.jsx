@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { API } from '../config';
 import styles from './CommitteeDashboard.module.css';
-
-const API = '/api';
 const DOC_LABELS = { sop: 'SOP', lor: 'LOR', resume: 'Resume', transcript: 'Transcript' };
 
 export default function CommitteeDashboard() {
@@ -57,7 +56,7 @@ export default function CommitteeDashboard() {
   }, [selected, token]);
 
   const downloadUrl = (studentId, docId) =>
-    `/api/committee/students/${studentId}/documents/${docId}/download?token=${encodeURIComponent(token)}`;
+    `${API}/committee/students/${studentId}/documents/${docId}/download?token=${encodeURIComponent(token)}`;
 
   if (loading) {
     return (

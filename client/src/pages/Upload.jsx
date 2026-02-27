@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { API } from '../config';
 import styles from './Upload.module.css';
-
-const API = '/api';
 const DOC_TYPES = [
   { id: 'sop', label: 'Statement of Purpose (SOP)' },
   { id: 'lor', label: 'Letter of Recommendation (LOR)' },
