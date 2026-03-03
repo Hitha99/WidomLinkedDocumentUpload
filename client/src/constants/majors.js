@@ -1,0 +1,16 @@
+export const COMMON_MAJORS = [
+  'Computer Science',
+  'Electrical Engineering',
+  'Mechanical Engineering',
+  'Civil Engineering',
+  'Chemical Engineering',
+  'Business Administration',
+  'Data Science',
+  'Information Technology',
+  'Biology',
+  'Psychology',
+  'Economics',
+  'Mathematics',
+  'Physics',
+  'Other',
+];

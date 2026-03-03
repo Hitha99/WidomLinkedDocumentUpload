@@ -1,3 +1,17 @@
+.notApproved {
+  padding: 2rem;
+  text-align: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-muted);
+}
+
+.notApproved .heading {
+  color: var(--text);
+  margin-bottom: 0.75rem;
+}
+
 .page {
   animation: fadeIn 0.4s ease;
 }
@@ -62,6 +76,47 @@
   gap: 0.75rem;
 }
 
+.additionalUpload {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.descInput {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.descInput::placeholder {
+  color: var(--text-muted);
+}
+
+.uploadBtn {
+  align-self: flex-start;
+  padding: 0.5rem 1rem;
+  background: var(--primary);
+  border: none;
+  border-radius: 8px;
+  color: #0d0d0d;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.uploadBtn:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.uploadBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .fileInput {
   font-size: 0.9rem;
   color: var(--text);
@@ -106,6 +161,14 @@
   border-bottom: none;
 }
 
+.docInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  flex: 1;
+}
+
 .docName {
   color: var(--text);
   font-size: 0.9rem;
@@ -113,6 +176,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.docDesc {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
 
 .removeBtn {
   padding: 0.25rem 0.5rem;

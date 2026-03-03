@@ -2,18 +2,26 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API } from '../config';
+import { COMMON_MAJORS } from '../constants/majors';
 import styles from './Login.module.css';
 
 export default function Login() {
-  const [view, setView] = useState('main'); // 'main' | 'login' | 'register' | 'loginStudent' | 'loginCommittee' | 'registerStudent' | 'registerCommittee'
+  const [view, setView] = useState('main');
   const [studentEmail, setStudentEmail] = useState('');
   const [studentPassword, setStudentPassword] = useState('');
-  const [committeeEmail, setCommitteeEmail] = useState('');
-  const [committeePassword, setCommitteePassword] = useState('');
+  const [expertEmail, setExpertEmail] = useState('');
+  const [expertPassword, setExpertPassword] = useState('');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [regStudentEmail, setRegStudentEmail] = useState('');
   const [regStudentPassword, setRegStudentPassword] = useState('');
-  const [regCommitteeEmail, setRegCommitteeEmail] = useState('');
-  const [regCommitteePassword, setRegCommitteePassword] = useState('');
+  const [regStudentMajor, setRegStudentMajor] = useState('');
+  const [regStudentMajorOther, setRegStudentMajorOther] = useState('');
+  const [regExpertEmail, setRegExpertEmail] = useState('');
+  const [regExpertPassword, setRegExpertPassword] = useState('');
+  const [regExpertMajors, setRegExpertMajors] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [resetLink, setResetLink] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { setAuth } = useAuth();
@@ -25,9 +33,49 @@ export default function Login() {
   }
 
   function goBack() {
-    if (view === 'loginStudent' || view === 'loginCommittee') setView('login');
-    else if (view === 'registerStudent' || view === 'registerCommittee') setView('register');
+    if (view.startsWith('login')) setView('login');
+    else if (view.startsWith('register')) setView('register');
+    else if (view === 'forgotPassword') setView('login');
     setError('');
+    setResetLink('');
+  }
+
+  function getStudentMajor() {
+    if (regStudentMajor === 'Other') return regStudentMajorOther.trim() || null;
+    return regStudentMajor || null;
+  }
+
+  function getExpertMajorsList() {
+    return regExpertMajors.split(',').map(m => m.trim()).filter(Boolean);
+  }
+
+  async function handleForgotPassword(e) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    setResetLink('');
+    try {
+      const res = await fetch(`${API}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Request failed');
+        return;
+      }
+      if (data.token) {
+        const base = window.location.origin + (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+        setResetLink(`${base}/reset-password?token=${data.token}`);
+      } else {
+        setResetLink('sent');
+      }
+    } catch (err) {
+      setError('Network error');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleStudentSubmit(e) {
@@ -46,7 +94,7 @@ export default function Login() {
         return;
       }
       if (data.user?.role !== 'student') {
-        setError('Not a student account. Use Committee login.');
+        setError('Not a student account. Use Expert or Admin login.');
         return;
       }
       setAuth(data.token, data.user);
@@ -58,7 +106,7 @@ export default function Login() {
     }
   }
 
-  async function handleCommitteeSubmit(e) {
+  async function handleExpertSubmit(e) {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -66,15 +114,43 @@ export default function Login() {
       const res = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: committeeEmail, password: committeePassword }),
+        body: JSON.stringify({ email: expertEmail, password: expertPassword }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error || 'Login failed');
         return;
       }
-      if (data.user?.role !== 'committee') {
-        setError('Not a committee account. Use Student login.');
+      if (data.user?.role !== 'expert') {
+        setError('Not an expert account. Use Student or Admin login.');
+        return;
+      }
+      setAuth(data.token, data.user);
+      navigate('/committee', { replace: true });
+    } catch (err) {
+      setError('Network error. Is the server running?');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAdminSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: adminEmail, password: adminPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || 'Login failed');
+        return;
+      }
+      if (data.user?.role !== 'admin') {
+        setError('Not an admin account.');
         return;
       }
       setAuth(data.token, data.user);
@@ -88,13 +164,18 @@ export default function Login() {
 
   async function handleRegisterStudent(e) {
     e.preventDefault();
+    const major = getStudentMajor();
+    if (!major) {
+      setError('Please select or enter your major');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
       const res = await fetch(`${API}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: regStudentEmail, password: regStudentPassword, role: 'student' }),
+        body: JSON.stringify({ email: regStudentEmail, password: regStudentPassword, role: 'student', major }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -110,15 +191,20 @@ export default function Login() {
     }
   }
 
-  async function handleRegisterCommittee(e) {
+  async function handleRegisterExpert(e) {
     e.preventDefault();
+    const majors = getExpertMajorsList();
+    if (majors.length === 0) {
+      setError('Enter at least one major (comma-separated)');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
       const res = await fetch(`${API}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: regCommitteeEmail, password: regCommitteePassword, role: 'committee' }),
+        body: JSON.stringify({ email: regExpertEmail, password: regExpertPassword, role: 'expert', majors }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -173,11 +259,54 @@ export default function Login() {
             <button
               type="button"
               className={styles.choiceBtnCommittee}
-              onClick={() => { setView('loginCommittee'); setError(''); }}
+              onClick={() => { setView('loginExpert'); setError(''); }}
             >
-              Committee login
+              Expert login
+            </button>
+            <button
+              type="button"
+              className={styles.choiceBtnCommittee}
+              onClick={() => { setView('loginAdmin'); setError(''); }}
+            >
+              Admin login
+            </button>
+            <button type="button" className={styles.toggle} onClick={() => { setView('forgotPassword'); setError(''); setResetLink(''); }}>
+              Forgot password?
             </button>
             <button type="button" className={styles.toggle} onClick={goToMain}>
+              ← Back
+            </button>
+          </div>
+        )}
+
+        {view === 'forgotPassword' && (
+          <div className={styles.section}>
+            <h2 className={styles.sectionTitle}>Forgot password</h2>
+            {!resetLink ? (
+              <form onSubmit={handleForgotPassword} className={styles.form}>
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={forgotEmail}
+                  onChange={e => setForgotEmail(e.target.value)}
+                  className={styles.input}
+                  required
+                />
+                <button type="submit" className={styles.btn} disabled={loading}>
+                  {loading ? 'Sending…' : 'Send reset link'}
+                </button>
+              </form>
+            ) : resetLink === 'sent' ? (
+              <p className={styles.successMsg}>If that email exists, a reset link was sent. Check your email.</p>
+            ) : (
+              <div>
+                <p className={styles.choiceHint}>Use this link to reset your password (valid 1 hour):</p>
+                <a href={resetLink} className={styles.resetLink} target="_blank" rel="noopener noreferrer">
+                  Reset password
+                </a>
+              </div>
+            )}
+            <button type="button" className={styles.toggle} onClick={goBack}>
               ← Back
             </button>
           </div>
@@ -196,9 +325,9 @@ export default function Login() {
             <button
               type="button"
               className={styles.choiceBtnCommittee}
-              onClick={() => { setView('registerCommittee'); setError(''); }}
+              onClick={() => { setView('registerExpert'); setError(''); }}
             >
-              Committee register
+              Expert register
             </button>
             <button type="button" className={styles.toggle} onClick={goToMain}>
               ← Back
@@ -232,21 +361,24 @@ export default function Login() {
                 {loading ? 'Please wait…' : 'Login'}
               </button>
             </form>
+            <button type="button" className={styles.toggle} onClick={() => { setView('forgotPassword'); setError(''); setResetLink(''); }}>
+              Forgot password?
+            </button>
             <button type="button" className={styles.toggle} onClick={goBack}>
               ← Back
             </button>
           </div>
         )}
 
-        {view === 'loginCommittee' && (
+        {view === 'loginExpert' && (
           <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>Committee login</h2>
-            <form onSubmit={handleCommitteeSubmit} className={styles.form}>
+            <h2 className={styles.sectionTitle}>Expert login</h2>
+            <form onSubmit={handleExpertSubmit} className={styles.form}>
               <input
                 type="email"
                 placeholder="Email"
-                value={committeeEmail}
-                onChange={e => setCommitteeEmail(e.target.value)}
+                value={expertEmail}
+                onChange={e => setExpertEmail(e.target.value)}
                 className={styles.input}
                 required
                 autoComplete="email"
@@ -254,8 +386,8 @@ export default function Login() {
               <input
                 type="password"
                 placeholder="Password"
-                value={committeePassword}
-                onChange={e => setCommitteePassword(e.target.value)}
+                value={expertPassword}
+                onChange={e => setExpertPassword(e.target.value)}
                 className={styles.input}
                 required
                 autoComplete="current-password"
@@ -264,6 +396,44 @@ export default function Login() {
                 {loading ? 'Please wait…' : 'Login'}
               </button>
             </form>
+            <button type="button" className={styles.toggle} onClick={() => { setView('forgotPassword'); setError(''); setResetLink(''); }}>
+              Forgot password?
+            </button>
+            <button type="button" className={styles.toggle} onClick={goBack}>
+              ← Back
+            </button>
+          </div>
+        )}
+
+        {view === 'loginAdmin' && (
+          <div className={styles.section}>
+            <h2 className={styles.sectionTitle}>Admin login</h2>
+            <form onSubmit={handleAdminSubmit} className={styles.form}>
+              <input
+                type="email"
+                placeholder="Email"
+                value={adminEmail}
+                onChange={e => setAdminEmail(e.target.value)}
+                className={styles.input}
+                required
+                autoComplete="email"
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={adminPassword}
+                onChange={e => setAdminPassword(e.target.value)}
+                className={styles.input}
+                required
+                autoComplete="current-password"
+              />
+              <button type="submit" className={styles.btnCommittee} disabled={loading}>
+                {loading ? 'Please wait…' : 'Login'}
+              </button>
+            </form>
+            <button type="button" className={styles.toggle} onClick={() => { setView('forgotPassword'); setError(''); setResetLink(''); }}>
+              Forgot password?
+            </button>
             <button type="button" className={styles.toggle} onClick={goBack}>
               ← Back
             </button>
@@ -292,6 +462,28 @@ export default function Login() {
                 required
                 autoComplete="new-password"
               />
+              <label className={styles.label}>Major</label>
+              <select
+                value={regStudentMajor}
+                onChange={e => setRegStudentMajor(e.target.value)}
+                className={styles.input}
+                required
+              >
+                <option value="">Select or type below if not in list</option>
+                {COMMON_MAJORS.filter(m => m !== 'Other').map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+                <option value="Other">Other (type below)</option>
+              </select>
+              {(regStudentMajor === 'Other' || !COMMON_MAJORS.includes(regStudentMajor)) && regStudentMajor && (
+                <input
+                  type="text"
+                  placeholder="Type your major"
+                  value={regStudentMajorOther}
+                  onChange={e => setRegStudentMajorOther(e.target.value)}
+                  className={styles.input}
+                />
+              )}
               <button type="submit" className={styles.btn} disabled={loading}>
                 {loading ? 'Please wait…' : 'Register'}
               </button>
@@ -302,15 +494,15 @@ export default function Login() {
           </div>
         )}
 
-        {view === 'registerCommittee' && (
+        {view === 'registerExpert' && (
           <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>Committee register</h2>
-            <form onSubmit={handleRegisterCommittee} className={styles.form}>
+            <h2 className={styles.sectionTitle}>Expert register</h2>
+            <form onSubmit={handleRegisterExpert} className={styles.form}>
               <input
                 type="email"
                 placeholder="Email"
-                value={regCommitteeEmail}
-                onChange={e => setRegCommitteeEmail(e.target.value)}
+                value={regExpertEmail}
+                onChange={e => setRegExpertEmail(e.target.value)}
                 className={styles.input}
                 required
                 autoComplete="email"
@@ -318,11 +510,18 @@ export default function Login() {
               <input
                 type="password"
                 placeholder="Password"
-                value={regCommitteePassword}
-                onChange={e => setRegCommitteePassword(e.target.value)}
+                value={regExpertPassword}
+                onChange={e => setRegExpertPassword(e.target.value)}
                 className={styles.input}
                 required
                 autoComplete="new-password"
+              />
+              <input
+                type="text"
+                placeholder="Majors you handle (comma-separated, e.g. CS, ECE)"
+                value={regExpertMajors}
+                onChange={e => setRegExpertMajors(e.target.value)}
+                className={styles.input}
               />
               <button type="submit" className={styles.btnCommittee} disabled={loading}>
                 {loading ? 'Please wait…' : 'Register'}

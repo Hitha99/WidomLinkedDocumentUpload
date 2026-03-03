@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { API } from '../config';
 import styles from './Upload.module.css';
+
 const DOC_TYPES = [
   { id: 'sop', label: 'Statement of Purpose (SOP)' },
   { id: 'lor', label: 'Letter of Recommendation (LOR)' },
   { id: 'resume', label: 'Resume' },
   { id: 'transcript', label: 'Transcript' },
+  { id: 'additional', label: 'Additional files' },
 ];
 
 export default function Upload() {
@@ -14,10 +16,13 @@ export default function Upload() {
   const [documents, setDocuments] = useState([]);
   const [message, setMessage] = useState('');
   const [savedMessage, setSavedMessage] = useState(null);
+  const [isApproved, setIsApproved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(null);
   const [messageSaving, setMessageSaving] = useState(false);
   const [error, setError] = useState('');
+  const [additionalFile, setAdditionalFile] = useState(null);
+  const [additionalDesc, setAdditionalDesc] = useState('');
 
   const headers = () => ({ Authorization: `Bearer ${token}` });
 
@@ -30,6 +35,7 @@ export default function Upload() {
         const data = await res.json();
         if (!cancelled) {
           setDocuments(data.documents || []);
+          setIsApproved(!!data.isApproved);
           if (data.message) {
             setSavedMessage(data.message);
             setMessage(data.message.message || '');
@@ -44,7 +50,7 @@ export default function Upload() {
     return () => { cancelled = true; };
   }, [token]);
 
-  async function handleUpload(type, file) {
+  async function handleUpload(type, file, description) {
     if (!file) return;
     setError('');
     setUploading(type);
@@ -52,6 +58,7 @@ export default function Upload() {
     form.append('file', file);
     form.append('type', type);
     form.append('originalName', file.name);
+    if (type === 'additional' && description != null) form.append('description', description);
     try {
       const res = await fetch(`${API}/documents/upload`, {
         method: 'POST',
@@ -61,6 +68,10 @@ export default function Upload() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Upload failed');
       setDocuments(prev => [data, ...prev]);
+      if (type === 'additional') {
+        setAdditionalFile(null);
+        setAdditionalDesc('');
+      }
     } catch (e) {
       setError(e.message || 'Upload failed');
     } finally {
@@ -107,10 +118,21 @@ export default function Upload() {
     );
   }
 
+  if (!isApproved) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.notApproved}>
+          <h2 className={styles.heading}>Upload not available</h2>
+          <p>Only selected students can add files. You have not been selected yet. Contact the admission committee.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.page}>
       <h2 className={styles.heading}>Upload documents for admission</h2>
-      <p className={styles.hint}>SOP, LOR, Resume, and Transcript. PDF, DOC, DOCX, or TXT (max 10MB each).</p>
+      <p className={styles.hint}>PDF, DOC, DOCX, or TXT (max 10MB each).</p>
 
       {error && <div className={styles.error}>{error}</div>}
 
@@ -118,24 +140,61 @@ export default function Upload() {
         {DOC_TYPES.map(({ id, label }) => {
           const list = documents.filter(d => d.type === id);
           const isUploading = uploading === id;
+          const isAdditional = id === 'additional';
           return (
             <section key={id} className={styles.section}>
               <label className={styles.label}>{label}</label>
-              <div className={styles.row}>
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt"
-                  className={styles.fileInput}
-                  onChange={e => handleUpload(id, e.target.files?.[0])}
-                  disabled={isUploading}
-                />
-                {isUploading && <span className={styles.status}>Uploading…</span>}
-              </div>
+              {isAdditional ? (
+                <div className={styles.additionalUpload}>
+                  <div className={styles.row}>
+                    <input
+                      type="file"
+                      accept=".pdf,.doc,.docx,.txt"
+                      className={styles.fileInput}
+                      onChange={e => setAdditionalFile(e.target.files?.[0] || null)}
+                      disabled={isUploading}
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Short description (e.g. Research paper, Certificate)"
+                    value={additionalDesc}
+                    onChange={e => setAdditionalDesc(e.target.value)}
+                    className={styles.descInput}
+                    disabled={isUploading}
+                    maxLength={200}
+                  />
+                  <button
+                    type="button"
+                    className={styles.uploadBtn}
+                    onClick={() => additionalFile && handleUpload(id, additionalFile, additionalDesc)}
+                    disabled={!additionalFile || isUploading}
+                  >
+                    {isUploading ? 'Uploading…' : 'Upload'}
+                  </button>
+                </div>
+              ) : (
+                <div className={styles.row}>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.txt"
+                    className={styles.fileInput}
+                    onChange={e => handleUpload(id, e.target.files?.[0])}
+                    disabled={isUploading}
+                  />
+                  {isUploading && <span className={styles.status}>Uploading…</span>}
+                </div>
+              )}
               {list.length > 0 && (
                 <ul className={styles.list}>
                   {list.map(doc => (
                     <li key={doc.id} className={styles.docItem}>
-                      <span className={styles.docName}>{doc.filename}</span>
+                      <div className={styles.docInfo}>
+                        <span className={styles.docName}>{doc.filename}</span>
+                        {isAdditional && doc.description && (
+                          <span className={styles.docDesc}>{doc.description}</span>
+                        )}
+                      </div>
                       <button
                         type="button"
                         className={styles.removeBtn}

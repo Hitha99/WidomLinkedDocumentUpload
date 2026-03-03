@@ -90,6 +90,13 @@ UI follows the same color theme as [WisdomLinked](https://github.com/WisdomLinke
 3. Repo **Settings → Pages** → Source: **GitHub Actions**.
 4. Push to `main`; the workflow deploys the frontend. Site: `https://<username>.github.io/<repo-name>/`
 
+## Admin account
+
+Admins see all students. Create an admin manually in the DB:
+```bash
+sqlite3 server/data/app.db "INSERT INTO users (email, password_hash, role) VALUES ('admin@example.com', 'yourpassword', 'admin');"
+```
+
 ## Environment (optional)
 
 - **Backend** (`server/`): `PORT` (default `4001`)

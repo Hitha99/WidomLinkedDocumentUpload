@@ -27,9 +27,33 @@ export function initDb() {
   try {
     db.exec(`ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'student'`);
   } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN approved INTEGER DEFAULT 0`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN major TEXT`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN majors TEXT`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN submitted_at TEXT`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE documents ADD COLUMN description TEXT`);
+  } catch (_) {}
   db.exec(`UPDATE users SET role = 'student' WHERE role IS NULL`);
+  db.exec(`UPDATE users SET role = 'expert' WHERE role = 'committee'`);
   db.exec(`
-
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      token TEXT UNIQUE NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+  db.exec(`
     CREATE TABLE IF NOT EXISTS documents (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -50,5 +74,30 @@ export function initDb() {
     );
   `);
 
+  seedSampleData();
+
   return db;
+}
+
+function seedSampleData() {
+  const admin = db.prepare('SELECT id FROM users WHERE role = ?').get('admin');
+  if (!admin) {
+    db.prepare(
+      'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)'
+    ).run('admin@wisdom.edu', 'admin123', 'admin');
+  }
+
+  const expert = db.prepare('SELECT id FROM users WHERE email = ?').get('expert@wisdom.edu');
+  if (!expert) {
+    db.prepare(
+      'INSERT INTO users (email, password_hash, role, majors) VALUES (?, ?, ?, ?)'
+    ).run('expert@wisdom.edu', 'expert123', 'expert', JSON.stringify(['Civil Engineering']));
+  }
+
+  const student = db.prepare('SELECT id FROM users WHERE email = ?').get('student@wisdom.edu');
+  if (!student) {
+    db.prepare(
+      'INSERT INTO users (email, password_hash, role, major) VALUES (?, ?, ?, ?)'
+    ).run('student@wisdom.edu', 'student123', 'student', 'Civil Engineering');
+  }
 }

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
+import ResetPassword from './pages/ResetPassword';
 import Upload from './pages/Upload';
 import CommitteeDashboard from './pages/CommitteeDashboard';
 import Layout from './components/Layout';
@@ -8,14 +9,14 @@ import Layout from './components/Layout';
 function StudentRoute({ children }) {
   const { token, user } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
-  if (user?.role === 'committee') return <Navigate to="/committee" replace />;
+  if (user?.role === 'expert' || user?.role === 'admin') return <Navigate to="/committee" replace />;
   return children;
 }
 
 function CommitteeRoute({ children }) {
   const { token, user } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
-  if (user?.role !== 'committee') return <Navigate to="/" replace />;
+  if (user?.role !== 'expert' && user?.role !== 'admin') return <Navigate to="/" replace />;
   return children;
 }
 
@@ -30,6 +31,7 @@ function App() {
       <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
         <Routes>
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/" element={<StudentRoute><Layout><Upload /></Layout></StudentRoute>} />
           <Route path="/committee" element={<CommitteeRoute><Layout><CommitteeDashboard /></Layout></CommitteeRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />

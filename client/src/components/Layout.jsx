@@ -4,7 +4,7 @@ import styles from './Layout.module.css';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
-  const isCommittee = user?.role === 'committee';
+  const isExpertOrAdmin = user?.role === 'expert' || user?.role === 'admin';
   const location = useLocation();
 
   return (
@@ -14,7 +14,7 @@ export default function Layout({ children }) {
           <span className="gradient_text">Wisdom Document System</span>
         </h1>
         <nav className={styles.nav}>
-          {isCommittee ? (
+          {isExpertOrAdmin ? (
             <Link to="/committee" className={location.pathname === '/committee' ? styles.navActive : styles.navLink}>
               Submissions
             </Link>
@@ -26,7 +26,7 @@ export default function Layout({ children }) {
         </nav>
         <div className={styles.userRow}>
           <span className={styles.email}>{user?.email}</span>
-          <span className={styles.role}>{isCommittee ? 'Committee' : 'Student'}</span>
+          <span className={styles.role}>{user?.role === 'admin' ? 'Admin' : user?.role === 'expert' ? 'Expert' : 'Student'}</span>
           <button type="button" className={styles.logout} onClick={logout}>
             Logout
           </button>

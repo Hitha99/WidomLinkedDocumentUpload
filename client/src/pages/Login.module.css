@@ -119,11 +119,39 @@
   border-color: var(--primary);
 }
 
+.label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
 .error {
   margin: 1rem 0 0;
   padding: 0.5rem 0;
   color: #e57373;
   font-size: 0.9rem;
+}
+
+.successMsg {
+  color: var(--primary-hover);
+  text-align: center;
+  margin: 1rem 0 0;
+}
+
+.resetLink {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--primary);
+  color: #0d0d0d;
+  border-radius: 8px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.resetLink:hover {
+  background: var(--primary-hover);
 }
 
 .btn {
