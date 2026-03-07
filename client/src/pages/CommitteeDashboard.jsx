@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { API } from '../config';
 import styles from './CommitteeDashboard.module.css';
 
-const DOC_LABELS = { sop: 'SOP', lor: 'LOR', resume: 'Resume', transcript: 'Transcript', additional: 'Additional files' };
+const DOC_LABELS = { sop: 'SOP', lor: 'LOR', resume: 'Resume', transcript: 'Transcript', additional: 'Additional files', feedback: 'Committee feedback' };
 
 export default function CommitteeDashboard() {
   const { token, user } = useAuth();
@@ -17,6 +17,10 @@ export default function CommitteeDashboard() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [enablingAll, setEnablingAll] = useState(false);
   const [disablingAll, setDisablingAll] = useState(false);
+  const [feedbackFile, setFeedbackFile] = useState(null);
+  const [feedbackNote, setFeedbackNote] = useState('');
+  const [feedbackUploading, setFeedbackUploading] = useState(false);
+  const [clarifySending, setClarifySending] = useState(false);
   const [error, setError] = useState('');
 
   const headers = () => ({ Authorization: `Bearer ${token}` });
@@ -148,7 +152,61 @@ export default function CommitteeDashboard() {
   const downloadUrl = (studentId, docId) =>
     `${API}/committee/students/${studentId}/documents/${docId}/download?token=${encodeURIComponent(token)}`;
 
-  const docLabel = (type) => DOC_LABELS[type] || type;
+  const docLabel = (type) => DOC_LABELS[type || ''] || type || 'Document';
+
+  const isAdmin = user?.role === 'admin';
+
+  async function sendClarification(e) {
+    e?.preventDefault();
+    if (!feedbackNote.trim() || !selected) return;
+    setError('');
+    setClarifySending(true);
+    try {
+      const res = await fetch(`${API}/committee/students/${selected.id}/clarify`, {
+        method: 'POST',
+        headers: { ...headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: feedbackNote.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to send');
+      setFeedbackNote('');
+      const r = await fetch(`${API}/committee/students/${selected.id}`, { headers: headers() });
+      const d = await r.json();
+      setDetail(d);
+    } catch (err) {
+      setError(err.message || 'Failed to send');
+    } finally {
+      setClarifySending(false);
+    }
+  }
+
+  async function uploadFeedback(e) {
+    e?.preventDefault();
+    if (!feedbackFile || !selected) return;
+    setError('');
+    setFeedbackUploading(true);
+    const form = new FormData();
+    form.append('file', feedbackFile);
+    form.append('originalName', feedbackFile.name);
+    if (feedbackNote.trim()) form.append('description', feedbackNote.trim());
+    try {
+      const res = await fetch(`${API}/committee/students/${selected.id}/feedback`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setFeedbackFile(null);
+      const r = await fetch(`${API}/committee/students/${selected.id}`, { headers: headers() });
+      const d = await r.json();
+      setDetail(d);
+    } catch (err) {
+      setError(err.message || 'Upload failed');
+    } finally {
+      setFeedbackUploading(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -224,13 +282,13 @@ title={s.approved ? 'Disable upload for student' : 'Enable upload for student'}
           {selected && detailLoading && (
             <p className={styles.placeholder}>Loading…</p>
           )}
-          {selected && detail && !detailLoading && (
+          {selected && detail && !detailLoading && detail.student && (
             <>
               <div className={styles.detailHeader}>
                 <div>
                   <h3 className={styles.detailTitle}>{detail.student.email}</h3>
                   <p className={styles.detailMeta}>
-                    Major: {detail.student.major || 'Not set'} · Registered: {new Date(detail.student.created_at).toLocaleString()}
+                    Major: {detail.student.major || 'Not set'} · Registered: {detail.student.created_at ? new Date(detail.student.created_at).toLocaleString() : '—'}
                     {detail.student.approved ? ' · ✓ Upload enabled' : ' · Upload not enabled'}
                   </p>
                 </div>
@@ -249,14 +307,14 @@ title={s.approved ? 'Disable upload for student' : 'Enable upload for student'}
                   <p className={styles.empty}>No documents uploaded</p>
                 ) : (
                   <ul className={styles.docList}>
-                    {detail.documents.map((doc) => (
+                    {(detail.documents || []).map((doc) => (
                       <li key={doc.id} className={styles.docItem}>
                         <div className={styles.docInfo}>
                           <div className={styles.docRow}>
                             <span className={styles.docType}>{docLabel(doc.type)}</span>
                             <span className={styles.docName}>{doc.filename}</span>
                           </div>
-                          {doc.type === 'additional' && doc.description && (
+                          {(doc.type === 'additional' || doc.type === 'feedback') && doc.description && (
                             <span className={styles.docDesc}>{doc.description}</span>
                           )}
                         </div>
@@ -271,6 +329,61 @@ title={s.approved ? 'Disable upload for student' : 'Enable upload for student'}
                       </li>
                     ))}
                   </ul>
+                )}
+              </div>
+
+              <div className={styles.section}>
+                <h4 className={styles.sectionTitle}>Feedback for student</h4>
+                <p className={styles.extraHint}>Send a clarification email and/or upload a file—either is optional.</p>
+                <div className={styles.feedbackForm}>
+                  <textarea
+                    placeholder="e.g. Your LOR is missing. Files incomplete—please upload a complete resume."
+                    value={feedbackNote}
+                    onChange={e => setFeedbackNote(e.target.value)}
+                    className={styles.clarifyTextarea}
+                    rows={3}
+                    disabled={feedbackUploading || clarifySending}
+                    maxLength={500}
+                  />
+                  <div className={styles.feedbackActions}>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); sendClarification(e); }}
+                      className={styles.addTypeBtn}
+                      disabled={!feedbackNote.trim() || clarifySending || feedbackUploading}
+                    >
+                      {clarifySending ? 'Sending…' : 'Send email'}
+                    </button>
+                    <span className={styles.feedbackActionsDivider}>or</span>
+                    <div className={styles.feedbackUploadRow}>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx,.txt"
+                        className={styles.fileInput}
+                        onChange={e => setFeedbackFile(e.target.files?.[0] || null)}
+                        disabled={feedbackUploading || clarifySending}
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); uploadFeedback(e); }}
+                        className={styles.addTypeBtn}
+                        disabled={!feedbackFile || feedbackUploading || clarifySending}
+                      >
+                        {feedbackUploading ? 'Uploading…' : 'Upload feedback'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {detail.clarifications?.length > 0 && (
+                  <div className={styles.clarifyHistory}>
+                    <p className={styles.extraHint}>Previous clarifications:</p>
+                    {(detail.clarifications || []).map(c => (
+                      <div key={c.id} className={styles.clarifyItem}>
+                        <p className={styles.clarifyText}>{c.message}</p>
+                        <p className={styles.clarifyMeta}>{c.from_email} · {new Date(c.created_at).toLocaleString()}</p>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
 

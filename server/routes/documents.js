@@ -36,11 +36,28 @@ router.use(authMiddleware, requireStudent);
 router.get('/', (req, res) => {
   const user = db.prepare('SELECT approved FROM users WHERE id = ?').get(req.userId) || {};
   const isApproved = user && user.approved === 1;
-  const docs = db.prepare(
-    'SELECT id, type, filename, path, size, created_at, description FROM documents WHERE user_id = ? ORDER BY created_at DESC'
-  ).all(req.userId);
+  let docs;
+  try {
+    docs = db.prepare(
+      'SELECT id, type, filename, path, size, created_at, description, uploaded_by FROM documents WHERE user_id = ? ORDER BY uploaded_by IS NULL DESC, created_at DESC'
+    ).all(req.userId);
+  } catch (_) {
+    docs = db.prepare(
+      'SELECT id, type, filename, path, size, created_at FROM documents WHERE user_id = ? ORDER BY created_at DESC'
+    ).all(req.userId);
+  }
   const msg = db.prepare('SELECT id, message, created_at FROM messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 1').get(req.userId);
-  res.json({ documents: docs, message: msg || null, isApproved: !!isApproved });
+  let clarifications = [];
+  try {
+    clarifications = db.prepare(`
+      SELECT c.id, c.message, c.created_at, u.email AS from_email
+      FROM clarifications c
+      JOIN users u ON u.id = c.from_user_id
+      WHERE c.student_id = ?
+      ORDER BY c.created_at DESC
+    `).all(req.userId);
+  } catch (_) {}
+  res.json({ documents: docs, message: msg || null, clarifications, isApproved: !!isApproved });
 });
 
 router.post('/upload', upload.single('file'), (req, res) => {
@@ -75,9 +92,18 @@ router.post('/message', (req, res) => {
   res.status(201).json(row);
 });
 
+router.get('/:id/download', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const doc = db.prepare('SELECT id, filename, path FROM documents WHERE id = ? AND user_id = ?').get(id, req.userId);
+  if (!doc) return res.status(404).json({ error: 'Not found' });
+  const filePath = path.join(uploadsDir, doc.path);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+  res.download(filePath, doc.filename);
+});
+
 router.delete('/:id', (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const row = db.prepare('SELECT id, path FROM documents WHERE id = ? AND user_id = ?').get(id, req.userId);
+  const row = db.prepare('SELECT id, path FROM documents WHERE id = ? AND user_id = ? AND uploaded_by IS NULL').get(id, req.userId);
   if (!row) return res.status(404).json({ error: 'Not found' });
   const filePath = path.join(uploadsDir, row.path);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);

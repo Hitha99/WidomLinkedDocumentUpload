@@ -39,9 +39,17 @@ export function initDb() {
   try {
     db.exec(`ALTER TABLE users ADD COLUMN submitted_at TEXT`);
   } catch (_) {}
-  try {
-    db.exec(`ALTER TABLE documents ADD COLUMN description TEXT`);
-  } catch (_) {}
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS clarifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      student_id INTEGER NOT NULL,
+      from_user_id INTEGER NOT NULL,
+      message TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (student_id) REFERENCES users(id),
+      FOREIGN KEY (from_user_id) REFERENCES users(id)
+    );
+  `);
   db.exec(`UPDATE users SET role = 'student' WHERE role IS NULL`);
   db.exec(`UPDATE users SET role = 'expert' WHERE role = 'committee'`);
   db.exec(`
@@ -73,6 +81,12 @@ export function initDb() {
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
   `);
+  try {
+    db.exec(`ALTER TABLE documents ADD COLUMN description TEXT`);
+  } catch (_) {}
+  try {
+    db.exec(`ALTER TABLE documents ADD COLUMN uploaded_by INTEGER`);
+  } catch (_) {}
 
   seedSampleData();
 
@@ -84,7 +98,7 @@ function seedSampleData() {
   if (!admin) {
     db.prepare(
       'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)'
-    ).run('admin@wisdom.edu', 'admin123', 'admin');
+    ).run('hithamagadi@gmail.com', 'admin123', 'admin');
   }
 
   const expert = db.prepare('SELECT id FROM users WHERE email = ?').get('expert@wisdom.edu');

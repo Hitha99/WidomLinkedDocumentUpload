@@ -3,7 +3,7 @@
 These accounts are created automatically when the server starts (if they don't already exist).
 
 ## Admin
-- **Email:** `admin@wisdom.edu`
+- **Email:** `hithamagadi@gmail.com`
 - **Password:** `admin123`
 
 ## Expert (Civil Engineering)

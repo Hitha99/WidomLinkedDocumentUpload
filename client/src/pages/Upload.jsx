@@ -138,7 +138,7 @@ export default function Upload() {
 
       <div className={styles.sections}>
         {DOC_TYPES.map(({ id, label }) => {
-          const list = documents.filter(d => d.type === id);
+          const list = documents.filter(d => d.type === id && !d.uploaded_by);
           const isUploading = uploading === id;
           const isAdditional = id === 'additional';
           return (
@@ -209,6 +209,35 @@ export default function Upload() {
             </section>
           );
         })}
+
+        {(() => {
+          const committeeFeedback = documents.filter(d => d.uploaded_by != null || d.type === 'feedback');
+          if (committeeFeedback.length === 0) return null;
+          return (
+            <section className={styles.section}>
+              <label className={styles.label}>Committee feedback</label>
+              <p className={styles.feedbackHint}>Comments, edits, or critiques from the admission committee.</p>
+              <ul className={styles.list}>
+                {committeeFeedback.map(doc => (
+                  <li key={doc.id} className={styles.docItem}>
+                    <div className={styles.docInfo}>
+                      <span className={styles.docName}>{doc.filename}</span>
+                      {doc.description && <span className={styles.docDesc}>{doc.description}</span>}
+                    </div>
+                    <a
+                      href={`${API}/documents/${doc.id}/download?token=${encodeURIComponent(token)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.downloadLink}
+                    >
+                      Download
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })()}
 
         <section className={styles.section}>
           <label className={styles.label}>Message to admission committee</label>

@@ -1,13 +1,31 @@
 import { Router } from 'express';
+import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import { db } from '../db.js';
 import { authMiddleware, requireCommittee } from '../middleware/auth.js';
 import { majorMatches } from '../utils/majorMatch.js';
+import { sendClarificationEmail } from '../utils/email.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, '..', 'uploads');
+
+const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const feedbackStorage = multer.diskStorage({
+  destination: (_, __, cb) => cb(null, uploadsDir),
+  filename: (_, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname) || '.bin'}`),
+});
+const feedbackUpload = multer({
+  storage: feedbackStorage,
+  limits: { fileSize: MAX_SIZE },
+  fileFilter: (_, file, cb) => {
+    const ext = (path.extname(file.originalname) || '').toLowerCase();
+    if (['.pdf', '.doc', '.docx', '.txt'].includes(ext)) return cb(null, true);
+    cb(new Error('Only PDF, DOC, DOCX, TXT allowed'));
+  },
+});
 
 function parseMajors(s) {
   if (!s) return [];
@@ -84,6 +102,60 @@ router.patch('/students/disable-all', (req, res) => {
   res.json({ count: result.changes });
 });
 
+// Expert/admin send clarification note to student (short note, e.g. files incomplete, needs clarification)
+router.post('/students/:studentId/clarify', async (req, res) => {
+  const studentId = parseInt(req.params.studentId, 10);
+  const student = db.prepare('SELECT id, email FROM users WHERE id = ? AND role = ?').get(studentId, 'student');
+  if (!student) return res.status(404).json({ error: 'Student not found' });
+  if (req.userRole !== 'admin') {
+    const expertMajors = (req.userMajors || []).map(m => m.trim().toLowerCase()).filter(Boolean);
+    const s = db.prepare('SELECT major FROM users WHERE id = ?').get(studentId);
+    if (!majorMatches(s?.major, expertMajors)) return res.status(403).json({ error: 'Student not in your majors' });
+  }
+  const message = req.body.message != null ? String(req.body.message).trim().slice(0, 500) : '';
+  if (!message) return res.status(400).json({ error: 'Message required' });
+  db.prepare('INSERT INTO clarifications (student_id, from_user_id, message) VALUES (?, ?, ?)').run(studentId, req.userId, message);
+  const row = db.prepare('SELECT id, message, created_at FROM clarifications WHERE id = last_insert_rowid()').get();
+  const fromUser = db.prepare('SELECT email FROM users WHERE id = ?').get(req.userId);
+  try {
+    await sendClarificationEmail(
+      student.email,
+      'Clarification from admission committee – Wisdom Document System',
+      `The admission committee has sent you a note:\n\n${message}\n\n— ${fromUser?.email || 'Committee'}`
+    );
+  } catch (_) {}
+  res.status(201).json(row);
+});
+
+// Admin/expert upload feedback/comment/critique for a student (expert: only for students in their majors)
+router.post('/students/:studentId/feedback', feedbackUpload.single('file'), async (req, res) => {
+  const studentId = parseInt(req.params.studentId, 10);
+  const student = db.prepare('SELECT id, email FROM users WHERE id = ? AND role = ?').get(studentId, 'student');
+  if (!student) return res.status(404).json({ error: 'Student not found' });
+  if (req.userRole !== 'admin') {
+    const expertMajors = (req.userMajors || []).map(m => m.trim().toLowerCase()).filter(Boolean);
+    const s = db.prepare('SELECT major FROM users WHERE id = ?').get(studentId);
+    if (!majorMatches(s?.major, expertMajors)) return res.status(403).json({ error: 'Student not in your majors' });
+  }
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+  const description = req.body.description != null ? String(req.body.description).trim().slice(0, 200) : null;
+  const originalName = req.body.originalName || req.file.originalname || 'Feedback';
+  db.prepare(
+    'INSERT INTO documents (user_id, type, filename, path, size, description, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(studentId, 'feedback', originalName, req.file.filename, req.file.size, description || null, req.userId);
+  const row = db.prepare('SELECT id, type, filename, path, size, created_at, description FROM documents WHERE id = last_insert_rowid()').get();
+  const fromUser = db.prepare('SELECT email FROM users WHERE id = ?').get(req.userId);
+  const descText = description ? `\n\nNote: ${description}` : '';
+  try {
+    await sendClarificationEmail(
+      student.email,
+      'New feedback from admission committee – Wisdom Document System',
+      `The admission committee has uploaded feedback for you: "${originalName}"${descText}\n\nPlease log in to view and download it.\n\n— ${fromUser?.email || 'Committee'}`
+    );
+  } catch (_) {}
+  res.status(201).json(row);
+});
+
 // Toggle student approval (expert: only if major match; admin: all)
 router.patch('/students/:id/approve', (req, res) => {
   const id = parseInt(req.params.id, 10);
@@ -108,14 +180,25 @@ router.get('/students/:id', (req, res) => {
     const expertMajors = (req.userMajors || []).map(m => m.trim().toLowerCase()).filter(Boolean);
     if (!majorMatches(student.major, expertMajors)) return res.status(404).json({ error: 'Student not found' });
   }
-  const documents = db.prepare(
-    'SELECT id, type, filename, path, size, created_at, description FROM documents WHERE user_id = ? ORDER BY type, created_at DESC'
-  ).all(studentId);
+  let documents;
+  try {
+    documents = db.prepare(
+      'SELECT id, type, filename, path, size, created_at, description, uploaded_by FROM documents WHERE user_id = ? ORDER BY uploaded_by IS NULL DESC, type, created_at DESC'
+    ).all(studentId);
+  } catch (err) {
+    documents = db.prepare(
+      'SELECT id, type, filename, path, size, created_at FROM documents WHERE user_id = ? ORDER BY type, created_at DESC'
+    ).all(studentId);
+  }
   const message = db.prepare('SELECT id, message, created_at FROM messages WHERE user_id = ? ORDER BY created_at DESC LIMIT 1').get(studentId);
+  const clarifications = db.prepare(
+    'SELECT c.id, c.message, c.created_at, u.email AS from_email FROM clarifications c LEFT JOIN users u ON u.id = c.from_user_id WHERE c.student_id = ? ORDER BY c.created_at DESC'
+  ).all(studentId);
   res.json({
     student: { id: student.id, email: student.email, major: student.major, created_at: student.created_at, approved: student.approved === 1 },
     documents,
     message: message || null,
+    clarifications,
   });
 });
 
